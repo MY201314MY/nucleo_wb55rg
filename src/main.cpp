@@ -150,9 +150,23 @@ int cnn_mnist() {
     int8_t* input_buffer = input->data.int8;
     int input_size = input->bytes;
 
-    for (int s = 0; s < num_samples; ++s) {
-        p_sample_data = samples[s];
-        std::cout << "\n----- Inference for " << sample_names[s] << " -----" << std::endl;
+    for (int s = 0; ;(s < num_samples)? s++ : s)
+    {
+        if(s < num_samples)
+        {
+            std::cout << "\n----- Inference for " << sample_names[s] << " -----" << std::endl;
+            p_sample_data = samples[s];
+        }
+        else
+        {
+            std::cout << "\n----- Inference for bsp uart receive -----" << std::endl;
+
+            extern struct k_sem bsp_rx_sem;
+            k_sem_take(&bsp_rx_sem, K_FOREVER);
+        
+            extern uint8_t digital_buffer[784];
+            p_sample_data = digital_buffer;
+        }
 
         // 1. Print raw image statistics and ASCII
         print_image_stats(p_sample_data, 784, sample_names[s]);
@@ -167,6 +181,10 @@ int cnn_mnist() {
             quantized_float = std::max(-128.0f, std::min(127.0f, quantized_float));
             input_buffer[i] = static_cast<int8_t>(std::round(quantized_float));
         }
+
+    #if 0
+        print_quantization_debug(p_sample_data, input_buffer, input_scale, input_zero_point, input_size);
+    #endif
 
         // 3. Invoke the model (timed using Zephyr k_uptime_get)
         uint32_t start_ms = k_uptime_get();
@@ -192,8 +210,16 @@ int cnn_mnist() {
                 max_digit = i;
             }
         }
-        std::cout << "\nResult for " << sample_names[s] << ": " << (max_probability * 100)
-                  << "% likely the digit [" << max_digit << "]" << std::endl;
+        if(s< num_samples)
+        {
+            std::cout << "Result for " << sample_names[s] << ": " << (max_probability * 100)
+                    << "% likely the digit [" << max_digit << "]" << std::endl;
+        }
+        else
+        {
+            std::cout << "Result for bsp uart receive: " << (max_probability * 100)
+                    << "% likely the digit [" << max_digit << "]" << std::endl;
+        }
     }
 
     return 0;
@@ -201,8 +227,7 @@ int cnn_mnist() {
 
 int main(void)
 {
-	printk("Address of sample %p\n", (void *)__rom_region_start);
-	printk("Hello sysbuild with mcuboot! %s\n", CONFIG_BOARD);
+	printk("board : %s\n", CONFIG_BOARD);
 
 	cnn_mnist();
 

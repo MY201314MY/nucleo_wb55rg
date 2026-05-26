@@ -6,7 +6,7 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(tf)
 
 # 1. Base application source files
-target_sources(app PRIVATE src/main.cpp)
+target_sources(app PRIVATE src/main.cpp src/bsp_uart.c)
 
 # ==============================================================================
 # 2. Automatically collect TFLite Micro and Signal source tree
