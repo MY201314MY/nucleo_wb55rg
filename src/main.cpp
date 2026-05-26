@@ -22,7 +22,7 @@
 
 #include "mnist_cnn_quant_model_data.h"
 
-// 💡 修正 1：将数组转换为标准的 uint8_t (0-255)，与你的预处理/归一化公式完全对齐
+// 💡 Fix 1: Convert arrays to standard uint8_t (0-255) to match your preprocessing/normalization.
 uint8_t sample3_data[784] = {
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -118,11 +118,11 @@ uint8_t sample8_data[784] = {
 
 uint8_t *p_sample_data = sample3_data;
 
-// 💡 优化点：分配 64KB，防止极端临界时内部 Buffer 重叠覆盖
+// 💡 Optimization: allocate 64KB to avoid internal buffer overlap in extreme edge cases
 constexpr int kTensorArenaSize = 64 * 1024;
 alignas(16) uint8_t tensor_arena[kTensorArenaSize];
 
-// --- 你的优秀调试函数保留（不做任何改动） ---
+// --- Keep your useful debug functions (no changes) ---
 void print_image_stats(uint8_t* image, int size, const char* name) {
     std::cout << "\n=== " << name << " Statistics ===" << std::endl;
     int min_val = 255, max_val = 0;
@@ -206,7 +206,7 @@ int cnn_mnist() {
     }
     std::cout << "✓ Model loaded successfully" << std::endl;
 
-    // 精准保留你的 10 个特定算子，保证原生解析
+    // Keep exactly these 10 operators to ensure the model ops are resolved correctly
     static tflite::MicroMutableOpResolver<10> micro_op_resolver;
     micro_op_resolver.AddConv2D();
     micro_op_resolver.AddMaxPool2D();
@@ -235,19 +235,19 @@ int cnn_mnist() {
     float output_scale = output->params.scale;
     int output_zero_point = output->params.zero_point;
     
-    // 1. 打印原始图像统计
+    // 1. Print raw image statistics
     print_image_stats(p_sample_data, 784, "Raw Input Image");
     print_image_ascii(p_sample_data, 28, 28);
     
-    // 2. 预处理量化
+    // 2. Preprocessing and quantization
     int8_t* input_buffer = input->data.int8;
     int input_size = input->bytes;
-    
-    // 💡 关键修改点：在此循环中加入了针对高对比度图像的边缘柔化处理
+
+    // 💡 Key tweak: apply edge softening for high-contrast images in this loop
     for (int i = 0; i < input_size; ++i) {
         float raw_val = p_sample_data[i];
 
-        // 对过于高亮的纯白硬边缘（如 253, 255）做缩放压制，使其退回灰度过渡态
+        // For very bright hard edges (e.g., 253, 255) apply slight scaling to soften into gray transitions
         if (raw_val > 200.0f) {
             raw_val = raw_val * 0.85f;
         }
@@ -258,17 +258,17 @@ int cnn_mnist() {
         input_buffer[i] = static_cast<int8_t>(std::round(quantized_float));
     }
 #if 0
-    // 3. 打印量化过程参数
+    // 3. Print quantization debug info
     print_quantization_debug(p_sample_data, input_buffer, input_scale, input_zero_point, input_size);
 #endif
-    // ===== 模型推理 =====
+    // ===== Model inference =====
     TfLiteStatus invoke_status = interpreter.Invoke();
     if (invoke_status != kTfLiteOk) {
         std::cerr << "ERROR: Model inference failed!" << std::endl;
         return 1;
     }
     
-    // ===== 输出详情 =====
+    // ===== Output details =====
     int8_t* output_buffer = output->data.int8;
     print_output_details(output_buffer, output_scale, output_zero_point);
     
