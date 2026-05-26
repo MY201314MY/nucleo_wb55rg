@@ -29,7 +29,7 @@ FRAME_TAIL = 0x55
 # Panel area Y: 512 ~ 612. Center Y is 562. Button height is 40, so top Y is 542.
 CLEAR_BTN = pygame.Rect(50, 542, 180, 40)
 SEND_BTN = pygame.Rect(282, 542, 180, 40)
-BRUSH_RADIUS = 6
+BRUSH_RADIUS = 12
 
 # ===================== Initialize =====================
 pygame.init()
