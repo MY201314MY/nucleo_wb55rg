@@ -169,7 +169,7 @@ int cnn_mnist() {
         }
 
         // 1. Print raw image statistics and ASCII
-        print_image_stats(p_sample_data, 784, sample_names[s]);
+        print_image_stats(p_sample_data, 784, s < num_samples ? sample_names[s] : "bsp uart receive");
         print_image_ascii(p_sample_data, 28, 28);
 
         // 2. Preprocessing and quantization (write into interpreter input buffer)
