@@ -117,12 +117,15 @@ int cnn_mnist() {
     std::cout << "✓ Model loaded successfully" << std::endl;
 
     // Keep exactly these 5 operators to ensure the model ops are resolved correctly
-    static tflite::MicroMutableOpResolver<5> micro_op_resolver;
+    static tflite::MicroMutableOpResolver<8> micro_op_resolver;
     micro_op_resolver.AddConv2D();
     micro_op_resolver.AddMaxPool2D();
     micro_op_resolver.AddReshape();
     micro_op_resolver.AddFullyConnected();
     micro_op_resolver.AddSoftmax();
+    micro_op_resolver.AddAdd();
+    micro_op_resolver.AddQuantize();
+    micro_op_resolver.AddMul(); 
 
     static tflite::MicroInterpreter interpreter(
         model, micro_op_resolver, tensor_arena, kTensorArenaSize);
@@ -151,7 +154,7 @@ int cnn_mnist() {
         "sample3", "sample4", "sample5",
         "sample6", "sample7", "sample8",
         "sample9" };
-    const int num_samples = 10;
+    const int num_samples = 1;
     const float inv_scale_255 = 1.0f / (255.0f * input_scale);
     const float zero_point_f = static_cast<float>(input_zero_point);
 
@@ -234,7 +237,8 @@ int cnn_mnist() {
 
 int main(void)
 {
-	printk("board : %s\n", CONFIG_BOARD);
+	printk("board : %s\r\n", CONFIG_BOARD);
+    printk("frequency : %d MHz (Cortex-M4)\r\n", sys_clock_hw_cycles_per_sec()/1000000);
 
 	cnn_mnist();
 
