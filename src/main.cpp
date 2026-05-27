@@ -21,7 +21,7 @@
 #include "tensorflow/lite/schema/schema_generated.h"
 
 #include "mnist_cnn_quant_model_data.h"
-#include "digital_sample_data.h"
+#include "test_input_digital.h"
 
 uint8_t *p_sample_data = NULL;
 
@@ -69,17 +69,20 @@ void print_quantization_debug(uint8_t* raw_image, int8_t* quantized_image, float
     std::cout << "\n=== Quantization Debug (first 20 pixels) ===" << std::endl;
     std::cout << "Quantization params: scale=" << scale << ", zero_point=" << zero_point << std::endl;
     std::cout << "Raw(0-255) -> Normalized(0-1) -> Quantized(int8)" << std::endl;
-    for (int i = 0; i < std::min(20, size); ++i) {
-        float raw_val = raw_image[i];
-        if (raw_val > 200.0f) {
-            raw_val = raw_val * 0.85f;
-        }
+    int printed_count = 0;
+    for (int i = 0; i < size && printed_count < 10; ++i) {
+        if (raw_image[i] == 0) continue; 
+        
+        float raw_val = static_cast<float>(raw_image[i]);
         float normalized = raw_val / 255.0f;
-        float quantized_float = normalized / scale + zero_point;
-        int8_t quantized = static_cast<int8_t>(std::round(quantized_float));
-        std::cout << "[" << i << "] " << std::setw(3) << (int)raw_image[i] << " -> "
-                  << std::fixed << std::setprecision(3) << normalized << " -> "
-                  << std::setw(4) << (int)quantized << " (expected: " << (int)quantized_image[i] << ")" << std::endl;
+        float quantized_float = (normalized / scale) + zero_point;
+        int8_t calc_quant = static_cast<int8_t>(std::max(-128.0f, std::min(127.0f, std::round(quantized_float))));
+        
+        std::cout << "  Idx[" << i << "] Raw: " << std::setw(3) << (int)raw_image[i] 
+                  << " -> Norm: " << std::fixed << std::setprecision(3) << normalized 
+                  << " -> Calc int8: " << std::setw(4) << (int)calc_quant 
+                  << " | Actual Buffer: " << std::setw(4) << (int)quantized_image[i] << std::endl;
+        printed_count++;
     }
 }
 
@@ -106,25 +109,20 @@ int cnn_mnist() {
     std::cout << "=== MNIST CNN Model Debug Version ===" << std::endl;
     std::cout << "========================================\n" << std::endl;
 
-    const tflite::Model* model = tflite::GetModel(_tmp_lstm_trained_model_mnist_cnn_quant_tflite);
+    const tflite::Model* model = tflite::GetModel(_mnist_cnn_quant_tflite);
     if (model->version() != TFLITE_SCHEMA_VERSION) {
         std::cerr << "Model schema version mismatch!" << std::endl;
         return 1;
     }
     std::cout << "✓ Model loaded successfully" << std::endl;
 
-    // Keep exactly these 10 operators to ensure the model ops are resolved correctly
-    static tflite::MicroMutableOpResolver<10> micro_op_resolver;
+    // Keep exactly these 5 operators to ensure the model ops are resolved correctly
+    static tflite::MicroMutableOpResolver<5> micro_op_resolver;
     micro_op_resolver.AddConv2D();
     micro_op_resolver.AddMaxPool2D();
     micro_op_resolver.AddReshape();
     micro_op_resolver.AddFullyConnected();
     micro_op_resolver.AddSoftmax();
-    micro_op_resolver.AddShape();
-    micro_op_resolver.AddStridedSlice();
-    micro_op_resolver.AddPack();
-    micro_op_resolver.AddCast();
-    micro_op_resolver.AddQuantize();
 
     static tflite::MicroInterpreter interpreter(
         model, micro_op_resolver, tensor_arena, kTensorArenaSize);
@@ -142,10 +140,20 @@ int cnn_mnist() {
     float output_scale = output->params.scale;
     int output_zero_point = output->params.zero_point;
     
-    // Run inference for three sample images: sample3, sample6 and sample8
-    uint8_t* samples[] = { (uint8_t*)sample3_data, (uint8_t*)sample6_data, (uint8_t*)sample8_data };
-    const char* sample_names[] = { "sample3", "sample6", "sample8" };
-    const int num_samples = 3;
+    // Run inference for ten sample images.
+    uint8_t* samples[] = { 
+        (uint8_t*)sample0_data, (uint8_t*)sample1_data, (uint8_t*)sample2_data, 
+        (uint8_t*)sample3_data, (uint8_t*)sample4_data, (uint8_t*)sample5_data,
+        (uint8_t*)sample6_data, (uint8_t*)sample7_data, (uint8_t*)sample8_data,
+        (uint8_t*)sample9_data };
+    const char* sample_names[] = { 
+        "sample0", "sample1", "sample2",
+        "sample3", "sample4", "sample5",
+        "sample6", "sample7", "sample8",
+        "sample9" };
+    const int num_samples = 10;
+    const float inv_scale_255 = 1.0f / (255.0f * input_scale);
+    const float zero_point_f = static_cast<float>(input_zero_point);
 
     int8_t* input_buffer = input->data.int8;
     int input_size = input->bytes;
@@ -174,10 +182,9 @@ int cnn_mnist() {
 
         // 2. Preprocessing and quantization (write into interpreter input buffer)
         for (int i = 0; i < input_size; ++i) {
-            float raw_val = p_sample_data[i];
-            if (raw_val > 200.0f) raw_val = raw_val * 0.85f;
-            float normalized = raw_val / 255.0f;
-            float quantized_float = normalized / input_scale + input_zero_point;
+            float raw_val = static_cast<float>(p_sample_data[i]);
+            float quantized_float = (raw_val * inv_scale_255) + zero_point_f;
+        
             quantized_float = std::max(-128.0f, std::min(127.0f, quantized_float));
             input_buffer[i] = static_cast<int8_t>(std::round(quantized_float));
         }

@@ -11,7 +11,7 @@ LOG_MODULE_REGISTER( uart, LOG_LEVEL_INF );
 static uint8_t uart_rxbuffer[1024] = { 0 };
 static struct ring_buf rx_rb;
 
-static uint8_t uart_txbuffer[1024] = { 0 };
+static uint8_t uart_txbuffer[8] = { 0 };
 static struct ring_buf tx_rb;
 
 static struct k_mutex rx_mutex;
