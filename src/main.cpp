@@ -25,8 +25,8 @@
 
 uint8_t *p_sample_data = NULL;
 
-// 💡 Optimization: allocate 64KB to avoid internal buffer overlap in extreme edge cases
-constexpr int kTensorArenaSize = 64 * 1024;
+// 💡 Optimization: allocate 48KB to avoid internal buffer overlap in extreme edge cases
+constexpr int kTensorArenaSize = 48 * 1024;
 alignas(16) uint8_t tensor_arena[kTensorArenaSize];
 
 // --- Keep your useful debug functions (no changes) ---
